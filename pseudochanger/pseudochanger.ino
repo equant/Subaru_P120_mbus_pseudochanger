@@ -1,4 +1,4 @@
-#include <AdvancedRemote.h>
+//#include <AdvancedRemote.h>
 #include <MBusPanasonic.h>
 
 //#define IPOD_SERIAL_DEBUG
@@ -10,26 +10,34 @@
 #define AUX_ACTIVE  2
 #define MBUS_DELAY 7
 
-#define mBusIn  PIN_D1
-#define mBusOut PIN_D0
+//#define mBusIn  PIN_D1
+//#define mBusOut PIN_D0
+#define mBusIn  13
+#define mBusOut 12
 
 //pin definitions
-static const byte SENSE_IPOD  = PIN_F4;
-static const byte LED_AUX     = PIN_C6;
-static const byte LED_IPOD    = PIN_C7;
-static const byte RELAY_AUX   = PIN_B0;
-static const byte RELAY_IPOD  = PIN_B1;
-static const byte TOGGLE_AUX  = PIN_D5;
-static const byte TOGGLE_IPOD = PIN_D4;
+//static const byte SENSE_IPOD  = PIN_F4;
+//static const byte LED_AUX     = PIN_C6;
+//static const byte LED_IPOD    = PIN_C7;
+//static const byte RELAY_AUX   = PIN_B0;
+//static const byte TOGGLE_AUX  = PIN_D5;
+//static const byte TOGGLE_IPOD = PIN_D4;
+
+static const byte PIN_D6 = 6;
+
+static const byte LED_AUX     = 2;
+static const byte LED_IPOD    = 3;
+static const byte TOGGLE_AUX  = 5;
+static const byte TOGGLE_IPOD = 4;
 
 byte activeInput;
 
-boolean ipodAvailable = false;
+boolean ipodAvailable = true;
 
 MBus mBus(mBusIn, mBusOut);
 
 //HardwareSerial uart = HardwareSerial();
-AdvancedRemote ipod = AdvancedRemote(Serial1);
+//AdvancedRemote ipod = AdvancedRemote(Serial1);
 
 byte playbackStatus = STOPPED;
 boolean updateDisplay = false;
@@ -48,6 +56,7 @@ uint64_t prevPing   = 0;
 uint32_t tmp = 0;
 
 /// iPod AdvancedRemote callbacks ////////////////////////////////////
+/*
 void shuffleModeHandler(AdvancedRemote::ShuffleMode mode){
   switch(mode){
   case AdvancedRemote::SHUFFLE_MODE_OFF:
@@ -81,6 +90,7 @@ void repeatModeHandler(AdvancedRemote::RepeatMode mode){
     break;
   }
 }
+*/
 
 void playlistPositionHandler(unsigned long playlistPosition){
   trackindex = playlistPosition;
@@ -90,6 +100,7 @@ void currentPlaylistSongCountHandler(unsigned long count){
   plistcount = count;
 }
 
+/*
 void pollingHandler(AdvancedRemote::PollingCommand command, unsigned long playlistPositionOrelapsedTimeMs){
   switch(command){
   // track change. 'val' is the playlist position
@@ -110,49 +121,33 @@ void pollingHandler(AdvancedRemote::PollingCommand command, unsigned long playli
     break;
   }
 }
+*/
+
 #ifdef DEBUG_MODE
+/*
 void iPodNameHandler(const char *ipodName){
     Serial.print("\tiPod name\t"); Serial.println(ipodName);  
 }
+*/
 #endif
 
 
 void setup(){
   ioinit();
   Serial.begin(9600); //12 Mbps, regardless of speed
-  //uart.begin(iPodSerial::IPOD_SERIAL_RATE);
-  //ipod.setSerial(uart);
-  //ipod.set
-  
-  //ipod.setFeedbackHandler(feedbackHandler);
-  ipod.setShuffleModeHandler(shuffleModeHandler);
-  ipod.setRepeatModeHandler(repeatModeHandler);
-  ipod.setPollingHandler(pollingHandler);
-  ipod.setPlaylistPositionHandler(playlistPositionHandler);
-  ipod.setCurrentPlaylistSongCountHandler(currentPlaylistSongCountHandler);
-#ifdef DEBUG_MODE
-  //ipod.setDebugPrint();
-  ipod.setiPodNameHandler(iPodNameHandler);
-#endif
-#ifdef IPOD_SERIAL_DEBUG
-  setDebugPrint(Serial);
-  setLogPrint(Serial);
-#endif
-  ipod.setup();
-  ipod.enable();
+  //setDebugPrint(Serial);
+  //setLogPrint(Serial);
+  nextUpdate=millis()+2000;
 }
 
 void loop(){
-  ipod.loop();
   switcher();
-  if(!ipodAvailable && digitalRead(SENSE_IPOD) == 0)
-    ipodAvailable = true;
-  else
-    ipodAvailable = false;
+  ipodAvailable = true;
   
-  if(updateDisplay || (playbackStatus&PLAYING && activeInput == AUX_ACTIVE && nextUpdate<millis())){
+  //if(updateDisplay || (playbackStatus&PLAYING && activeInput == AUX_ACTIVE && nextUpdate<millis())){
+  if(updateDisplay || (activeInput == AUX_ACTIVE && nextUpdate<millis())){
     digitalWrite(PIN_D6, ~digitalRead(PIN_D6));
-    //mBus.sendPlayingTrack(plistindex, trackindex, playtime, playbackStatus);
+    mBus.sendPlayingTrack(plistindex, trackindex, playtime, playbackStatus);
     mBus.send(0xE9401010A0A0002ull);
     updateDisplay = false;
     
@@ -160,7 +155,8 @@ void loop(){
   }
   
 #ifdef DEBUG_MODE
-  else if(nextUpdate<millis()){
+  #else if(nextUpdate<millis()){
+  if(nextUpdate<millis()){
     Serial.print("\nDEBUG\n\tplayback status\t"); Serial.println(playbackStatus, BIN);
     Serial.print("\tinput\t"); 
     if(activeInput==IPOD_ACTIVE) Serial.println("iPod");
@@ -173,12 +169,8 @@ void loop(){
     Serial.print("\tplistcount\t"); Serial.println(plistcount);
     Serial.print("\ttrackcount\t"); Serial.println(trackcount);
 
-    if(ipodAvailable || activeInput==IPOD_ACTIVE){
-       ipod.getiPodName(); //sent to iPodNameHandler
-      Serial.print("\trequesting iPod state\t"); ipod.getTimeAndStatusInfo(); //sent to PlaylistPositionHandler
-      
-    }
-
+    //mBus.send(0xE9401010A0A0002ull);
+    mBus.send(0xE930001AAAA0009ULL);
     nextUpdate=millis()+2000;
   }
 #endif
@@ -326,18 +318,12 @@ void switcher(){
     mBus.send(0xE9300010A000009ULL);
     digitalWrite(LED_AUX,  0);
     digitalWrite(LED_IPOD, 1);
-#ifndef DISABLE_RELAY
-    digitalWrite(RELAY_IPOD, 1);
-    delay(2);
-    digitalWrite(RELAY_IPOD, 0);
-#endif
-    activeInput = IPOD_ACTIVE;
     
     //pause iPod if it's playing
     if(ipodAvailable && playbackStatus&PLAYING){
-      ipod.enable();
-      ipod.setPollingMode(AdvancedRemote::POLLING_START);
-      ipod.controlPlayback(AdvancedRemote::PLAYBACK_CONTROL_PLAY_PAUSE);
+      //ipod.enable();
+      //ipod.setPollingMode(AdvancedRemote::POLLING_START);
+      //ipod.controlPlayback(AdvancedRemote::PLAYBACK_CONTROL_PLAY_PAUSE);
       playbackStatus = (playbackStatus & (~PBSTATUS_MASK)) | PLAYING;
     }
   }
@@ -348,19 +334,9 @@ void switcher(){
     digitalWrite(LED_AUX,  1);
     digitalWrite(LED_IPOD, 0);
 #ifndef DISABLE_RELAY
-    digitalWrite(RELAY_AUX, 1);
-    delay(2);
-    digitalWrite(RELAY_AUX, 0);
 #endif
     activeInput = AUX_ACTIVE;
     
-    //pause iPod if it's playing
-    if(ipodAvailable && playbackStatus&PLAYING){
-      ipod.controlPlayback(AdvancedRemote::PLAYBACK_CONTROL_PLAY_PAUSE);
-      ipod.setPollingMode(AdvancedRemote::POLLING_STOP);
-      playbackStatus = (playbackStatus & (~PBSTATUS_MASK)) | PAUSED;
-      ipod.disable();
-    }
   }
 }
 
@@ -369,22 +345,12 @@ void switcher(){
 void ioinit(){
   pinMode(LED_AUX, OUTPUT); // aux led
   pinMode(LED_IPOD, OUTPUT); // ipod led
-  pinMode(RELAY_AUX, OUTPUT); // relay, switch to aux
-  pinMode(RELAY_IPOD, OUTPUT); // relay, switch to ipod
-  digitalWrite(RELAY_AUX,  0);
-  digitalWrite(RELAY_IPOD, 0);
   digitalWrite(LED_AUX,    1);
   digitalWrite(LED_IPOD,   0);
   
   pinMode(TOGGLE_AUX,  INPUT_PULLUP); // toggle, aux
   pinMode(TOGGLE_IPOD, INPUT_PULLUP); // toggle, ipod
-  pinMode(SENSE_IPOD, INPUT_PULLUP);
-  
+
   //set the input to the aux by default until an iPod is detected
-#ifndef DISABLE_RELAY
-  digitalWrite(RELAY_AUX, 1);
-  delay(2);
-  digitalWrite(RELAY_AUX, 0);
-#endif
   activeInput = AUX_ACTIVE;
 }
