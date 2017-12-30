@@ -21,6 +21,7 @@ http://tucsontelegraph.blogspot.com/2017/03/adding-auxbt-to-subaru-stereo-throug
 http://www.hohensohn.info/mbus/
 
 https://github.com/kjanesch/pseudochanger
+
 https://sites.google.com/site/kevinsjanesch/projects/subaru-line-in
 
 https://github.com/Olstyle/MBus
